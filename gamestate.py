@@ -35,8 +35,7 @@ def init_new_game():
 	local_map = current_level.level_map
 
 	#player creation and placing
-	starting_room = choice(local_map.rooms)
-	(player_x, player_y) = starting_room.center()
+	(player_x, player_y) = current_level.get_player_start_pos()
 	player = generate_player(current_level, player_x, player_y)
 
 	#let our player embark on an adventure with some helpfull items

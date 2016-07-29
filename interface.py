@@ -290,6 +290,11 @@ def handle_keys(game):
 			#open equip menu
 			equip_menu(player, game.log)
 
+		elif key_char == 's':
+			for tile_row in player.entire_map:
+				for tile in tile_row:
+					tile.explored = True
+
 		else: player.state = 'idle' #if pressed no key or keys that aren't available
 
 def target_tile(game, max_range = None):

@@ -32,24 +32,29 @@ class StationLevel:
 		self.place_items()
 		self.place_stairs()
 
+	def get_player_start_pos(self):
+		"returns coordinates of the center of the starting room, where player will be placed"
+		return self.level_map.starting_room.center()
+
 	def place_enemies(self):
 		"fill the station level with enemies"
 		local_map = self.level_map.map_grid
 		for room in self.level_map.rooms:
-			num_enemies = libtcod.random_get_int(0, 0, MAX_ROOM_ENEMIES)
-			
-			for i in range(num_enemies):
-				#choose a random spot for an enemy
-				x = libtcod.random_get_int(0, room.x1 + 1, room.x2 - 1)
-				y = libtcod.random_get_int(0, room.y1 + 1, room.y2 - 1)
+			if room != self.level_map.starting_room:
+				num_enemies = libtcod.random_get_int(0, 0, MAX_ROOM_ENEMIES)
+				
+				for i in range(num_enemies):
+					#choose a random spot for an enemy
+					x = libtcod.random_get_int(0, room.x1 + 1, room.x2 - 1)
+					y = libtcod.random_get_int(0, room.y1 + 1, room.y2 - 1)
 
-				#very poor mechanism of calculating chances
-				dice = libtcod.random_get_int(0, 0, 100)
-				if not local_map[x][y].is_blocked():
-					if dice < 80:
-						generate_enemy(self, x, y, 0)
-					else:
-						generate_enemy(self, x, y, 1)
+					#very poor mechanism of calculating chances
+					dice = libtcod.random_get_int(0, 0, 100)
+					if not local_map[x][y].is_blocked():
+						if dice < 80:
+							generate_enemy(self, x, y, 0)
+						else:
+							generate_enemy(self, x, y, 1)
 
 	def place_items(self):
 		"fill rooms with items"
@@ -163,62 +168,142 @@ class GameMap:
 		simply speaking, a two-dimensional list of tiles
 		also contains rooms and corridors
 	"""
-	def __init__(self, map_width = MAP_WIDTH, map_height = MAP_HEIGHT):
-		"create blank map and fill it with rooms"
+	def __init__(self):
+		"create map using BSP"
 		#fill map with impassable tiles
-		self.map_grid = [ [Tile(x, y, 'wall') for y in range(map_height)] for x in range(map_width) ]
+		self.map_grid = [ [Tile(x, y, 'wall') for y in range(MAP_HEIGHT)] for x in range(MAP_WIDTH) ]
 
-		#rooms of the current map, presented as instances of 'Rectangle' class
-		self.rooms = []
+		self.rooms = [] #rooms on current map, presented by Rectangle instances
+		
+		#new root node
+		bsp = libtcod.bsp_new_with_size(0, 0, MAP_WIDTH, MAP_HEIGHT)
 
-		#randomly fill the level with rooms, connected via one-tile corridors
-		for r in range(MAX_ROOMS):
-			#generate new room as the rectangle with random position and sizes
-			width = libtcod.random_get_int(0, ROOM_MIN_SIZE, ROOM_MAX_SIZE)
-			height = libtcod.random_get_int(0, ROOM_MIN_SIZE, ROOM_MAX_SIZE)
-			x = libtcod.random_get_int(0, 0, map_width - width - 1)
-			y = libtcod.random_get_int(0, 0, map_height - height - 1)
-			new_room = Rectangle(x, y, width, height)
-			failed = False
+		#split into nodes
+		libtcod.bsp_split_recursive(bsp, 0, DEPTH, ROOM_MIN_SIZE + 1, ROOM_MIN_SIZE + 1, 1.5, 1.5)
+
+		#traverse the nodes and create rooms
+		libtcod.bsp_traverse_inverted_level_order(bsp, self.traverse_node)
+
+		self.choose_starting_room()
+
+	def traverse_node(self, node, dat):
+		"callback-function for BSP map generating"
+		if libtcod.bsp_is_leaf(node): #if node is a leaf, create room
+			min_x = node.x + 1
+			max_x = node.x + node.w - 1
+			min_y = node.y + 1
+			max_y = node.y + node.h - 1
 			
-			#check if rooms intersect
-			for other_room in self.rooms:
-				if new_room.intersect(other_room):
-					failed = True
-					break
-			
-			#connect rooms with corridors
-			if not failed:
-				self.create_room(new_room)
-				(new_x, new_y) = new_room.center()
-				
-				if len(self.rooms) > 0:
-					(prev_x, prev_y) = self.rooms[len(self.rooms)-2].center()
-					if libtcod.random_get_int(0, 0, 1):
-						self.create_hor_tunnel(prev_x, new_x, prev_y)
-						self.create_vert_tunnel(prev_y, new_y, new_x)
-					else:
-						self.create_vert_tunnel(prev_y, new_y, prev_x)
-						self.create_hor_tunnel(prev_x, new_x, new_y)
+			if max_x == MAP_WIDTH - 1: max_x -= 1
+			if max_y == MAP_HEIGHT - 1: max_y -= 1
 
+			#randomize room size if FULL_ROOMS is disabled
+			if FULL_ROOMS == False:
+				min_x = libtcod.random_get_int(0, min_x, max_x - ROOM_MIN_SIZE + 1)
+				min_y = libtcod.random_get_int(0, min_y, max_y - ROOM_MIN_SIZE + 1)
+				max_x = libtcod.random_get_int(0, min_x + ROOM_MIN_SIZE - 2, max_x)
+				max_y = libtcod.random_get_int(0, min_y + ROOM_MIN_SIZE - 2, max_y)
+
+			node.x = min_x
+			node.y = min_y
+			node.w = max_x - min_x + 1
+			node.h = max_y - min_y + 1
+
+			new_room = Rectangle(node.x, node.y, node.w - 1, node.h - 1)
+			self.create_room(new_room)
+
+		else: #if the node is not a leaf, connect its left and right children
+			
+			left = libtcod.bsp_left(node)
+			right = libtcod.bsp_right(node)
+			node.x = min(left.x, right.x)
+			node.y = min(left.y, right.y)
+			node.w = max(left.x + left.w, right.x + right.w) - node.x
+			node.h = max(left.y + left.h, right.y + right.h) - node.y
+
+			if node.horizontal: #if node is splitted horizontally
+				#if left and right nodes intersect
+				if left.x + left.w - 1 < right.x or right.x + right.w - 1 < left.x:
+					x1 = libtcod.random_get_int(0, left.x , left.x + left.w - 1)
+					x2 = libtcod.random_get_int(0, right.x , right.x + right.w - 1)
+					y = libtcod.random_get_int(0, left.y + left.h, right.y)
+					self.create_vert_line_up(x1, y - 1)
+					self.create_hor_line(y, x1, x2)
+					self.create_vert_line_down(x2, y + 1)
+
+				#if left and right nodes do not intersect
+				else:
+					min_x = max(left.x + 1, right.x + 1)
+					max_x = min(left.x + left.w - 1, right.x + right.w - 1)
+					x = libtcod.random_get_int(0, min_x, max_x)
+					self.create_vert_line_down(x, right.y)
+					self.create_vert_line_up(x, right.y - 1)
+			else: #if node is splitted vertically
+				#if left and right nodes intersect
+				if left.y + left.h - 1 < right.y or right.y + right.h - 1 < left.y:
+					y1 = libtcod.random_get_int(0, left.y + 1, left.y + left.h - 1)
+					y2 = libtcod.random_get_int(0, right.y + 1, right.y + right.h - 1)
+					x = libtcod.random_get_int(0, left.x + left.w + 1, right.x)
+					self.create_hor_line_left(x - 1, y1)
+					self.create_vert_line(x, y1, y2)
+					self.create_hor_line_right(x + 1, y2)
+
+				#if left and right nodes do not intersect
+				else:
+					min_y = max(left.y + 1, right.y + 1)
+					max_y = min(left.y + left.h - 1, right.y + right.h - 1)
+					y = libtcod.random_get_int(0, min_y, max_y)
+					self.create_hor_line_left(right.x - 1, y)
+					self.create_hor_line_right(right.x, y)
+		return True
+	
 	def create_room(self, room):
 		"carve rectangle room"
 		#go through the tiles in the rectangle and make them passable by changing their type
-		for x in range(room.x1 + 1, room.x2):
-			for y in range(room.y1 + 1, room.y2):
+		for x in range(room.x1, room.x2 + 1):
+			for y in range(room.y1, room.y2 + 1):
 				self.map_grid[x][y].set_type('floor')
 
 		self.rooms.append(room)
 
-	def create_vert_tunnel(self, y1, y2, x):
+	def create_vert_line(self, x, y1, y2):
 		"carve vertical tunnel"
 		for y in range(min(y1, y2), max(y1, y2) + 1):
 			self.map_grid[x][y].set_type('floor')
-
-	def create_hor_tunnel(self, x1, x2, y):
-		"carve horizontal tunneln"
+	 
+	def create_vert_line_up(self, x, y):
+		"carve vertical tunnel from point and up"
+		while y > 0 and not self.map_grid[x][y].walkable:
+			self.map_grid[x][y].set_type('floor')
+			y -= 1
+	 
+	def create_vert_line_down(self, x, y):
+		"carve vertical tunnel from point and down"
+		while y < MAP_HEIGHT and not self.map_grid[x][y].walkable:
+			self.map_grid[x][y].set_type('floor')
+			y += 1
+	 
+	def create_hor_line(self, y, x1, x2):
+		"carve horizontal tunnel"
 		for x in range(min(x1, x2), max(x1, x2) + 1):
 			self.map_grid[x][y].set_type('floor')
+	 
+	def create_hor_line_left(self, x, y):
+		"carve horizontal tunnel from point and left"
+		while x > 0 and not self.map_grid[x][y].walkable:
+			self.map_grid[x][y].set_type('floor')
+			x -= 1
+	 
+	def create_hor_line_right(self, x, y):
+		"carve horizontal tunnel from point and right"
+		while x < MAP_WIDTH and not self.map_grid[x][y].walkable:
+			self.map_grid[x][y].set_type('floor')
+			x += 1
+
+	def choose_starting_room(self):
+		"randomly choose the index of the room, where player will be placed"
+		self.starting_room = random.choice(self.rooms)
+		
 
 class Rectangle:
 	"a rectangle on the map, used to characterize a room"

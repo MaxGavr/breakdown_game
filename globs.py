@@ -17,11 +17,12 @@ SCREEN_WIDTH = 80
 SCREEN_HEIGHT = 50
 
 #map generating settings
-ROOM_MAX_SIZE = 10
-ROOM_MIN_SIZE = 6
-MAX_ROOMS = 30
 MAX_ROOM_ENEMIES = 3
 MAX_ROOM_ITEMS = 3
+#BSP options
+DEPTH = 10 #number of node splittings
+ROOM_MIN_SIZE = 6
+FULL_ROOMS = False
 
 #sizes and coordinates for GUI
 PANEL_HEIGHT = 7

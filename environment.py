@@ -27,9 +27,14 @@ class Environment(Object):
 def generate_object(station_level): #for now it only constructs down stairs
 	"construct new Environment object"
 	local_map = station_level.level_map
-	(last_x, last_y) = local_map.rooms[-1].center()
 	
-	obj = Environment(local_map.map_grid[last_x][last_y], '<', libtcod.white, 'stairs', interaction = next_level)
+	room = choice(local_map.rooms)
+	while room == local_map.starting_room:
+		room = choice(local_map.rooms)
+
+	(x, y) = room.center()
+	
+	obj = Environment(local_map.map_grid[x][y], '<', libtcod.white, 'stairs', interaction = next_level)
 	station_level.environment.append(obj)
 
 def next_level(game):
@@ -45,8 +50,8 @@ def next_level(game):
 	
 	#place player in one of the rooms
 	local_map = game.location.level_map
-	starting_room = choice(local_map.rooms)
-	game.player.pos = local_map.map_grid[starting_room.center()[0]][starting_room.center()[1]]
+	(player_x, player_y) = game.location.get_player_start_pos()
+	game.player.pos = local_map.map_grid[player_x][player_y]
 
 	libtcod.console_clear(game.consols['map'])
 	for char in game.location.characters:
