@@ -31,7 +31,7 @@ def play_game(game):
 	while not libtcod.console_is_window_closed():
 
 		#catch keyboard/mouse events
-		libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS | libtcod.EVENT_MOUSE, key, mouse)
+		event = libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS | libtcod.EVENT_MOUSE, key, mouse)
 		
 		#render the screen
 		render_all(game)
@@ -40,12 +40,15 @@ def play_game(game):
 		#erase all objects at their old locations, before they move
 		clear_all(game)
 			
-		#handle keys and exit game if needed
-		result = handle_keys(game)
-		if result == 'exit':
-			return game
+		#handle keys only if some keyboard/mouse event happened
+		if event != 0:
+			result = handle_keys(game)
+			if result == 'exit':
+				return game
+		else: #if no keys pressed and mouse clicks, player remains 'idle'
+			game.player.state = 'idle'
 
-		#if game is not interrupted and the player made his move NPCs take their turn
+		#if game is not interrupted and the player made his move, NPCs take their turn
 		if game.game_state == 'playing' and game.player.state != 'idle':
 			for char in game.location.characters:
 				char.ai.take_turn(game, game.player)
@@ -155,7 +158,7 @@ def load_game():
 	game.player.init_fov()
 
 	#initialize new consols
-	map_console = libtcod.console_new(MAP_WIDTH, MAP_HEIGHT)
+	map_console = libtcod.console_new(CAMERA_WIDTH, CAMERA_HEIGHT)
 	panel_console = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
 	game.consols = {'map': map_console, 'panel': panel_console}
 

@@ -178,15 +178,18 @@ class Player(Character):
 
 	def compute_fov(self):
 		"similar to character's 'compute_fov', but also marks all visible tiles: tile.is_in_fov = True"
-		Character.compute_fov(self)
-		for y in range(MAP_HEIGHT):
-			for x in range(MAP_WIDTH):
-				visible = libtcod.map_is_in_fov(self.fov, x, y)
-				if visible: #tile is in the player's FOV
-					self.entire_map[x][y].explored = True
-					self.entire_map[x][y].is_in_fov = True
-				else:
-					self.entire_map[x][y].is_in_fov = False
+		if self.fov_recompute:
+			self.fov_recompute = False
+			libtcod.map_compute_fov(self.fov, self.pos.x, self.pos.y, TORCH_RADIUS, FOV_LIGHT_WALLS, FOV_ALGO)
+			
+			for y in range(MAP_HEIGHT):
+				for x in range(MAP_WIDTH):
+					visible = libtcod.map_is_in_fov(self.fov, x, y)
+					if visible: #tile is in the player's FOV
+						self.entire_map[x][y].explored = True
+						self.entire_map[x][y].is_in_fov = True
+					else:
+						self.entire_map[x][y].is_in_fov = False
 
 
 

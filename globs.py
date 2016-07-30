@@ -9,8 +9,12 @@ import libtcodpy as libtcod
 LIMIT_FPS = 20
 
 #size of the map
-MAP_WIDTH = 80
-MAP_HEIGHT = 43
+MAP_WIDTH = 100
+MAP_HEIGHT = 80
+
+#size of the camera screen
+CAMERA_WIDTH = 80
+CAMERA_HEIGHT = 43
 
 #size of the window
 SCREEN_WIDTH = 80

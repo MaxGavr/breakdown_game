@@ -25,9 +25,10 @@ class GameState:
 		self.log = log #GameLog instance, message log of the current game session
 
 		#game state used for tracking player's death, pause and so on
-		#currently used states: 'playing', 'exit'
+		#currently used states: 'playing', 'exit', 'dead'
 		self.game_state = 'playing'
 		self.consols = consols #libtcod consols dict; consols are used in most UI-functions
+		self.camera_pos = (None, None)
 
 def init_new_game():
 	"start off a new game session; constructs new GameState instance"
@@ -46,7 +47,7 @@ def init_new_game():
 	add_item_to_char(player, 3)
 	
 	#off-screen console
-	map_console = libtcod.console_new(MAP_WIDTH, MAP_HEIGHT)
+	map_console = libtcod.console_new(CAMERA_WIDTH, CAMERA_HEIGHT)
 	#off-screen console for stats panel
 	panel_console = libtcod.console_new(SCREEN_WIDTH, PANEL_HEIGHT)
 	consols = {'map': map_console, 'panel': panel_console}

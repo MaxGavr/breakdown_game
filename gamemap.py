@@ -153,7 +153,8 @@ class Tile:
 	def calculate_color(self):
 		"determine the color of the tile, based on its properties"
 		if not self.explored:
-			return None
+			return libtcod.black
+			
 		if self.is_in_fov:
 			if self.highlighted:
 				return self.hi_color

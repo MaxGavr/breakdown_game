@@ -1,5 +1,6 @@
 from math import sqrt
 import libtcodpy as libtcod
+from interface import to_camera_coordinates
 
 #-----------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~
@@ -40,11 +41,17 @@ class Object:
 		else:
 			return False
 	
-	def draw(self, console):
+	def draw(self, camera_pos, console):
 		"draw the character that represents this object at its position"
-		if self.pos.is_in_fov or (self.always_visible and self.pos.explored):
-			libtcod.console_put_char_ex(console, self.pos.x, self.pos.y, self.icon, self.color, libtcod.BKGND_DEFAULT)
+		(x, y) = to_camera_coordinates(camera_pos, self.pos.x, self.pos.y)
+		if x is not None:
+			if self.pos.is_in_fov or (self.always_visible and self.pos.explored):
+				libtcod.console_put_char_ex(console, x, y, self.icon, self.color, libtcod.BKGND_DEFAULT)
 		
-	def clear(self, console):
+	def clear(self, camera_pos, console):
 		"erase the character that represents this object"
-		libtcod.console_put_char(console, self.pos.x, self.pos.y, ' ')
+		(x, y) = to_camera_coordinates(camera_pos, self.pos.x, self.pos.y)
+		if x is not None:
+			libtcod.console_put_char(console, x, y, ' ')
+
+

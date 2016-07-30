@@ -10,20 +10,21 @@ from globs import *
 
 def render_all(game):
 	"render map, GUI and all in-game objects"
+	game.camera_pos = move_camera(game.camera_pos, game.player.pos.x, game.player.pos.y)
 	game.player.compute_fov()
 
 	#draw environment, including stairs
-	for obj in game.location.environment: obj.draw(game.consols['map'])
+	for obj in game.location.environment: obj.draw(game.camera_pos, game.consols['map'])
 	#draw all items on the level first
-	for item in game.location.items: item.draw(game.consols['map'])
+	for item in game.location.items: item.draw(game.camera_pos, game.consols['map'])
 	#draw all characters on the level
-	for character in game.location.characters: character.draw(game.consols['map'])
-	game.player.draw(game.consols['map'])
+	for character in game.location.characters: character.draw(game.camera_pos, game.consols['map'])
+	game.player.draw(game.camera_pos, game.consols['map'])
 	
 	render_tiles(game)
 
 	#blit the contents of "map_console" to the root console
-	libtcod.console_blit(game.consols['map'], 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0, 0)
+	libtcod.console_blit(game.consols['map'], 0, 0, CAMERA_WIDTH, CAMERA_HEIGHT, 0, 0, 0)
 
 	#prepare to render GUI panel
 	libtcod.console_set_default_background(game.consols['panel'], libtcod.darkest_grey)
@@ -48,23 +49,44 @@ def render_all(game):
 def render_tiles(game):
 	"go through all tiles, and set their background color"
 	local_map = game.location.level_map.map_grid
-	for y in range(MAP_HEIGHT):
-		for x in range(MAP_WIDTH):
-			color = local_map[x][y].calculate_color()
-			if color is not None:
-				libtcod.console_set_char_background(game.consols['map'], x, y, color, libtcod.BKGND_SET)
-
-	libtcod.console_blit(game.consols['map'], 0, 0, MAP_WIDTH, MAP_HEIGHT, 0, 0, 0)
+	for y in range(CAMERA_HEIGHT):
+		for x in range(CAMERA_WIDTH):
+			(map_x, map_y) = (game.camera_pos[0] + x, game.camera_pos[1] + y)
+			color = local_map[map_x][map_y].calculate_color()
+			libtcod.console_set_char_background(game.consols['map'], x, y, color, libtcod.BKGND_SET)
 
 def clear_all(game):
 	"erase all object icons from their position"
-	game.player.clear(game.consols['map'])
+	game.player.clear(game.camera_pos, game.consols['map'])
 	for char in game.location.characters:
-		char.clear(game.consols['map'])
+		char.clear(game.camera_pos, game.consols['map'])
 	for item in game.location.items:
-		item.clear(game.consols['map'])
+		item.clear(game.camera_pos, game.consols['map'])
 	for obj in game.location.environment:
-		obj.clear(game.consols['map'])
+		obj.clear(game.camera_pos, game.consols['map'])
+
+def move_camera(camera_pos, target_x, target_y):
+	"move the camera, so the (target_x, target_y) is the center"
+	#new camera coordinates (top-left corner of the screen relative to the map)
+	x = target_x - CAMERA_WIDTH / 2  #coordinates so that the target is at the center of the screen
+	y = target_y - CAMERA_HEIGHT / 2
+ 
+	#make sure the camera doesn't see outside the map
+	if x < 0: x = 0
+	if y < 0: y = 0
+	if x > MAP_WIDTH - CAMERA_WIDTH: x = MAP_WIDTH - CAMERA_WIDTH
+	if y > MAP_HEIGHT - CAMERA_HEIGHT: y = MAP_HEIGHT - CAMERA_HEIGHT
+
+	return (x, y)
+
+def to_camera_coordinates(camera_pos, x, y):
+	"convert coordinates on the map to coordinates on the screen"
+	(x, y) = (x - camera_pos[0], y - camera_pos[1])
+ 
+	if (x < 0 or y < 0 or x >= CAMERA_WIDTH or y >= CAMERA_HEIGHT):
+		return (None, None)  #if it's outside the view, return nothing
+ 
+	return (x, y)
 
 def render_bar(panel, x, y, total_bar_width, name, value, max_value, bar_color, back_color):
 	"render GUI bar with specific properties"
@@ -291,6 +313,7 @@ def handle_keys(game):
 			equip_menu(player, game.log)
 
 		elif key_char == 's':
+			#just for test; shows whole map
 			for tile_row in player.entire_map:
 				for tile in tile_row:
 					tile.explored = True
