@@ -83,9 +83,18 @@ def to_camera_coordinates(camera_pos, x, y):
 	"convert coordinates on the map to coordinates on the screen"
 	(x, y) = (x - camera_pos[0], y - camera_pos[1])
  
-	if (x < 0 or y < 0 or x >= CAMERA_WIDTH or y >= CAMERA_HEIGHT):
+	if x < 0 or y < 0 or x >= CAMERA_WIDTH or y >= CAMERA_HEIGHT:
 		return (None, None)  #if it's outside the view, return nothing
  
+	return (x, y)
+
+def to_map_coordinates(camera_pos, x, y):
+	"convert camera coordinates to position on the map"
+	if x < 0 or y < 0 or x >= SCREEN_WIDTH or y >= SCREEN_HEIGHT:
+		return (None, None)
+
+	(x, y) = (x + camera_pos[0], y + camera_pos[1])
+
 	return (x, y)
 
 def render_bar(panel, x, y, total_bar_width, name, value, max_value, bar_color, back_color):
@@ -337,10 +346,11 @@ def target_tile(game, max_range = None):
 	
 	while True:
 		(x, y) = (mouse.cx, mouse.cy)
+		(map_x, map_y) = to_map_coordinates(game.camera_pos, x, y)
 
-		#show the line sight
-		libtcod.line_init(game.player.pos.x, game.player.pos.y, x, y)
-		libtcod.line(game.player.pos.x, game.player.pos.y, x, y, highlight_callback)
+		#show the line of sight
+		libtcod.line_init(game.player.pos.x, game.player.pos.y, map_x, map_y)
+		libtcod.line(game.player.pos.x, game.player.pos.y, map_x, map_y, highlight_callback)
 
 		#redraw map
 		render_all(game)
@@ -348,19 +358,20 @@ def target_tile(game, max_range = None):
 		clear_all(game)
 
 		#hide previous line of sight
-		libtcod.line(game.player.pos.x, game.player.pos.y, x, y, unhighlight_callback)
+		libtcod.line(game.player.pos.x, game.player.pos.y, map_x, map_y, unhighlight_callback)
 
 		libtcod.sys_check_for_event(libtcod.EVENT_KEY_PRESS|libtcod.EVENT_MOUSE, key, mouse)
 		(x, y) = (mouse.cx, mouse.cy)
+		(map_x, map_y) = to_map_coordinates(game.camera_pos, x, y)
 
 		#if clicked tile is in player's FOV and within max range, return tile's coordinates
 		if mouse.lbutton_pressed:
-			if not game.player.entire_map[x][y].is_in_fov:
+			if not game.player.entire_map[map_x][map_y].is_in_fov:
 				game.log.message("You can't see that place.", libtcod.grey)
-			elif max_range is not None and player.distance(x, y) > max_range :
+			elif max_range is not None and player.distance(map_x, map_y) > max_range :
 				game.log.message("That place is to far away.", libtcod.grey)
 			else:
-				return (x, y)
+				return (map_x, map_y)
 
 		#cancel if the player right-clicked or pressed Escape
 		if mouse.rbutton_pressed or key.vk == libtcod.KEY_ESCAPE:
